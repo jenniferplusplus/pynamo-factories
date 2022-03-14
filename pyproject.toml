@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pynamodb-factories"
-version = "0.1.1"
+version = "0.1.2"
 description = "Fakers for Pynamo models, based on the very helpful pydantic-factories."
 authors = ["Jennifer Moore <jenniferplusplus@gmail.com>"]
 license = "Apache-2.0"
