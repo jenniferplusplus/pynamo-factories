@@ -8,8 +8,14 @@ from pynamodb.models import Model as PynamoModel
 from pynamodb.attributes import (
     Attribute, BinaryAttribute, BinarySetAttribute, UnicodeAttribute, UnicodeSetAttribute, JSONAttribute,
     BooleanAttribute, NumberAttribute, NumberSetAttribute, VersionAttribute, TTLAttribute, UTCDateTimeAttribute,
-    NullAttribute, MapAttribute, ListAttribute, DynamicMapAttribute
+    NullAttribute, MapAttribute, ListAttribute
 )
+
+try:
+    from pynamodb.attributes import DynamicMapAttribute
+except ImportError:
+    DynamicMapAttribute = None
+    pass
 
 from pynamodb_factories.exceptions import UnsupportedException, ConfigurationError
 from pynamodb_factories.fields import Use
@@ -107,7 +113,7 @@ class PynamoModelFactory(ABC, Generic[T]):
             return fake.date_time(tzinfo=timezone.utc)
         if isinstance(field, NullAttribute):
             return None
-        if isinstance(field, MapAttribute) or isinstance(field, DynamicMapAttribute):
+        if isinstance(field, MapAttribute) or (DynamicMapAttribute and isinstance(field, DynamicMapAttribute)):
             if field is MapAttribute or field is DynamicMapAttribute:
                 # Just a raw MapAttribute
                 return fake.pydict()

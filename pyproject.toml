@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pynamodb-factories"
-version = "0.1.0"
+version = "0.1.1"
 description = "Fakers for Pynamo models, based on the very helpful pydantic-factories."
 authors = ["Jennifer Moore <jenniferplusplus@gmail.com>"]
 license = "Apache-2.0"
@@ -9,8 +9,8 @@ keywords = ["pynamod", "pynamodb", "fake", "pynamodb-factories"]
 
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
-pynamodb = "^5.2.1"
 Faker = "^13.3.1"
+pynamodb = ">=4.3.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.0"
