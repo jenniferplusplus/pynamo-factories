@@ -11,8 +11,8 @@ from pynamodb.attributes import (
     NullAttribute, MapAttribute, ListAttribute, DynamicMapAttribute
 )
 
-from pynamo_factories.exceptions import UnsupportedException, ConfigurationError
-from pynamo_factories.fields import Use
+from pynamodb_factories.exceptions import UnsupportedException, ConfigurationError
+from pynamodb_factories.fields import Use
 
 T = TypeVar("T", bound=Union[PynamoModel, Attribute])
 default_faker = Faker()

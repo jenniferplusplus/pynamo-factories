@@ -1,7 +1,7 @@
 from pynamodb.attributes import UnicodeAttribute
 from pynamodb.models import Model
 
-from pynamo_factories.factory import PynamoModelFactory
+from pynamodb_factories.factory import PynamoModelFactory
 from tests.test_models.models import Meta
 
 

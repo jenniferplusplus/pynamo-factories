@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from pynamo_factories.factory import PynamoModelFactory
-from pynamo_factories.fields import Use
+from pynamodb_factories.factory import PynamoModelFactory
+from pynamodb_factories.fields import Use
 from tests.test_models.models import MapModel
 
 

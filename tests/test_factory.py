@@ -3,7 +3,7 @@ from datetime import datetime
 from pytest import mark
 from pynamodb.models import Model
 
-from pynamo_factories.factory import PynamoModelFactory
+from pynamodb_factories.factory import PynamoModelFactory
 from tests.test_models.models import EmptyModel, NumberModel, BinaryModel, BooleanModel, UnicodeModel, JsonModel, \
     VersionModel, TtlModel, DateModel, NullModel, MapModel, ListModel, ComplexMap
 
