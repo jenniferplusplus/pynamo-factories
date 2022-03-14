@@ -200,3 +200,23 @@ class TestFactories:
         for each in actual.list_of if actual.list_of else range(0):
             assert isinstance(each, ComplexMap)
         pass
+
+    def test_build_args(self, seed):
+        class MapFactory(PynamoModelFactory):
+            __model__ = MapModel
+            pass
+
+        build_args = {
+            'map_of': {
+                'name': 'given name',
+                'email': 'given_email@example.com',
+                'birthday': datetime(1990, 1, 1, 12, 0, 0)
+            }
+        }
+
+        MapFactory.set_random_seed(seed)
+        actual = MapFactory.build(**build_args)
+        assert actual.serialize() is not None
+        assert actual.map_of.name == 'given name'
+        assert actual.map_of.email == 'given_email@example.com'
+        assert actual.map_of.birthday == datetime(1990, 1, 1, 12, 0, 0)

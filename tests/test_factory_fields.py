@@ -5,7 +5,7 @@ from pynamo_factories.fields import Use
 from tests.test_models.models import MapModel
 
 
-class TestFactoryFields():
+class TestFactoryFields:
     def test_value(self):
         class ValueFactory(PynamoModelFactory):
             __model__ = MapModel
