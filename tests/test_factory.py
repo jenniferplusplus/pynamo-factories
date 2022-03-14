@@ -220,3 +220,16 @@ class TestFactories:
         assert actual.map_of.name == 'given name'
         assert actual.map_of.email == 'given_email@example.com'
         assert actual.map_of.birthday == datetime(1990, 1, 1, 12, 0, 0)
+
+    def test_extra_build_args(self, seed):
+        class MapFactory(PynamoModelFactory):
+            __model__ = UnicodeModel
+            pass
+
+        build_args = {
+            'dne': 'some value'
+        }
+
+        MapFactory.set_random_seed(seed)
+        actual = MapFactory.build(**build_args)
+        assert actual.serialize() is not None

@@ -42,14 +42,17 @@ class PynamoModelFactory(ABC, Generic[T]):
         """
         builds an instance of the factory's __model__
         """
+        keys = []
         for field_name, field in cls._get_model().get_attributes().items():
+            keys.append(field_name)
             if cls.should_set_field_default(field_name=field_name, field=field):
                 # Leave the field out of the dict and PynamoDB will set the default value on creation
                 pass
             elif field_name not in kwargs and isinstance(field, Attribute):
                 build_arg = cls._build_field(field_name=field_name, field=field)
                 kwargs.update(build_arg)
-        return cast(T, cls.__model__(**kwargs))
+        build_args = dict(filter(lambda item: item[0] in keys, kwargs.items()))
+        return cast(T, cls.__model__(**build_args))
 
     @classmethod
     def create_factory(cls, model: Type[T], base_factory: Optional[Type["PynamoModelFactory"]] = None, **kwargs):

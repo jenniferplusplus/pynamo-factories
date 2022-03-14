@@ -1,6 +1,6 @@
 from pynamodb.attributes import NumberAttribute, NumberSetAttribute, BinaryAttribute, BinarySetAttribute, \
     BooleanAttribute, UnicodeAttribute, UnicodeSetAttribute, JSONAttribute, VersionAttribute, TTLAttribute, \
-    UTCDateTimeAttribute, NullAttribute, MapAttribute, ListAttribute
+    UTCDateTimeAttribute, NullAttribute, MapAttribute, ListAttribute, DynamicMapAttribute
 from pynamodb.models import Model, MetaModel
 
 
@@ -72,7 +72,7 @@ class NullModel(EmptyModel):
 
 class MapModel(EmptyModel):
     map = MapAttribute()
-    # dyn_map = DynamicMapAttribute()
+    dyn_map = DynamicMapAttribute()
     map_of = ComplexMap()
     pass
 
