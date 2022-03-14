@@ -176,6 +176,9 @@ class TestFactories:
         assert hasattr(actual, 'map')
         assert actual.map is not None
 
+        assert hasattr(actual, 'dyn_map')
+        assert actual.dyn_map is not None
+
         assert hasattr(actual, 'map_of')
         assert isinstance(actual.map_of, ComplexMap)
         pass
