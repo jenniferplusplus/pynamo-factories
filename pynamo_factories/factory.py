@@ -3,20 +3,26 @@ from contextlib import suppress
 from datetime import tzinfo, timezone
 from random import random, seed as random_seed, randint
 from typing import Generic, Type, Optional, TypeVar, cast, Union
+import inspect
 
 from faker import Faker
 from pynamodb.models import Model as PynamoModel
 from pynamodb.attributes import (
     Attribute, BinaryAttribute, BinarySetAttribute, UnicodeAttribute, UnicodeSetAttribute, JSONAttribute,
     BooleanAttribute, NumberAttribute, NumberSetAttribute, VersionAttribute, TTLAttribute, UTCDateTimeAttribute,
-    NullAttribute, MapAttribute, ListAttribute, DynamicMapAttribute
+    NullAttribute, MapAttribute, ListAttribute, DynamicMapAttribute, AttributeContainerMeta, AttributeContainer, DiscriminatorAttribute
 )
 
 from pynamo_factories.fields import Use
 
 T = TypeVar("T", bound=Union[PynamoModel, Attribute])
 default_faker = Faker()
-
+PynamoDB_attributes = (
+    Attribute, BinaryAttribute, BinarySetAttribute, UnicodeAttribute, UnicodeSetAttribute, JSONAttribute,
+    BooleanAttribute, NumberAttribute, NumberSetAttribute, VersionAttribute, TTLAttribute, UTCDateTimeAttribute,
+    NullAttribute, MapAttribute, ListAttribute, DynamicMapAttribute, AttributeContainerMeta, AttributeContainer,
+    DiscriminatorAttribute
+)
 
 class ConfigurationError(Exception):
     pass
@@ -30,7 +36,9 @@ class PynamoModelFactory(ABC, Generic[T]):
     __model__: Type[T]
     __faker__: Optional[Faker]
     __allow_nulls__: bool = True
+    __allow_empty__: bool = True
     __raise_unsupported__: bool = False
+    _known_types = {}
 
     @classmethod
     def set_random_seed(cls, seed):
@@ -43,12 +51,14 @@ class PynamoModelFactory(ABC, Generic[T]):
         """
         builds an instance of the factory's __model__
         """
-        for field_name, field_cls in cls._get_model().get_attributes():
-            if cls.should_set_field_default(field_name=field_name, field_cls=field_cls):
+        for field_name, field in cls._get_model().get_attributes().items():
+            # if field.__class__ not in PynamoDB_attributes:
+            #     cls._get_known_types().setdefault(field.__class__.__name__, field.__class__)
+            if cls.should_set_field_default(field_name=field_name, field=field):
                 # Leave the field out of the dict and PynamoDB will set the default value on creation
                 pass
-            elif field_name not in kwargs and isinstance(field_cls, Attribute):
-                build_arg = cls._build_attribute(attr_name=field_name, attr_class=field_cls)
+            elif field_name not in kwargs and isinstance(field, Attribute):
+                build_arg = cls._build_attribute(attr_name=field_name, attr=field)
                 kwargs.update(build_arg)
         return cast(T, cls.__model__(**kwargs))
 
@@ -62,12 +72,19 @@ class PynamoModelFactory(ABC, Generic[T]):
         :return: a PynamoModelFactory. Call .build() to build a model.
         """
         kwargs.setdefault("__faker__", cls.get_faker())
-        kwargs.setdefault("__allow_none_optionals__", cls.__allow_none_optionals__)
+        kwargs.setdefault("__allow_nulls__", cls.__allow_nulls__)
+        kwargs.setdefault("__allow_empty__", cls.__allow_empty__)
+        kwargs.setdefault("__raise_unsupported__", cls.__raise_unsupported__)
 
+        try:
+            name = model.__name__
+        except AttributeError:
+            name = model.__class__.__name__
+        pass
         return cast(
             PynamoModelFactory,
             type(
-                f"{model.__name__}Factory",
+                f"{name}Factory",
                 (base_factory or cls,),
                 {"__model__": model, **kwargs},
             ),
@@ -87,23 +104,24 @@ class PynamoModelFactory(ABC, Generic[T]):
     def set_field(cls, *, field_name, field_cls: Attribute):
         fake = cls.get_faker()
         if isinstance(field_cls, BinaryAttribute):
-            return fake.sentence()
+            return bytes(fake.sentence(), 'utf-8')
         if isinstance(field_cls, BinarySetAttribute):
-            return fake.sentences(randint(0, 5))
+            return map(utf8_bytes, fake.sentences(randint(0, 5)))
         if isinstance(field_cls, BooleanAttribute):
             return fake.pybool()
         if isinstance(field_cls, UnicodeAttribute):
             return fake.sentence()
         if isinstance(field_cls, UnicodeSetAttribute):
-            return fake.sentences(randint(0, 5))
+            return fake.sentences(randint(cls._min_range(), 5))
         if isinstance(field_cls, JSONAttribute):
-            return fake.pydict()
+            return fake.pydict(
+                allowed_types=['str', 'int', 'float', 'email', 'address', 'job', 'phone_number', 'name', 'iso8601'])
+        if isinstance(field_cls, VersionAttribute):
+            return fake.pyint(1, 5)
         if isinstance(field_cls, NumberAttribute):
             return fake.pyint()
         if isinstance(field_cls, NumberSetAttribute):
-            return fake.pylist(randint(0, 5), False, value_types='int')
-        if isinstance(field_cls, VersionAttribute):
-            return fake.pyint(1, 5)
+            return fake.pylist(randint(cls._min_range(), 5), False, value_types='int')
         if isinstance(field_cls, TTLAttribute):
             return fake.date_time_this_year(after_now=True, tzinfo=timezone.utc)
         if isinstance(field_cls, UTCDateTimeAttribute):
@@ -118,16 +136,16 @@ class PynamoModelFactory(ABC, Generic[T]):
                 return cls.create_factory(field_cls.__class__).build()
         if isinstance(field_cls, ListAttribute):
             if field_cls.element_type:
-                factory = cls.create_factory(field_cls.element_type.__class__)
+                factory = cls.create_factory(field_cls.element_type)
                 values = []
-                for _ in range(randint(0, 5)):
+                for _ in range(randint(cls._min_range(), 5)):
                     values.append(factory.build())
                 return values
             else:
                 return fake.words(randint(0, 5))
 
         if cls.__raise_unsupported__:
-            raise UnsupportedException
+            raise UnsupportedException(f'Field {field_name}: {type(field_cls)} is not supported')
         return None
 
     @classmethod
@@ -135,14 +153,17 @@ class PynamoModelFactory(ABC, Generic[T]):
         """Override to define custom criteria for when a field should be None"""
         if not cls.__allow_nulls__:
             return False
+        if type(field_cls) in (VersionAttribute,):
+            # Some attributes are not None-able
+            return False
         if field_cls.null and random() <= 0.25:
             return True
         return False
 
     @classmethod
-    def should_set_field_default(cls, *, field_name, field_cls) -> bool:
+    def should_set_field_default(cls, *, field_name, field) -> bool:
         """Override to define custom criteria for when a field should be set to its default or default_for_new value"""
-        if field_cls.default or field_cls.default_for_new:
+        if field.default or field.default_for_new:
             return random() <= 0.25
         return False
 
@@ -157,20 +178,32 @@ class PynamoModelFactory(ABC, Generic[T]):
         if not hasattr(cls, "__model__") or not cls.__model__:
             raise ConfigurationError("missing model class in factory Meta")
         model = cls.__model__
-        if is_pynamo_model(model):
-            with suppress(NameError):
-                cast(PynamoModel, model).update_forward_refs()
+        # if is_pynamo_model(model):
+        #     with suppress(NameError):
+        #         cast(PynamoModel, model)
         return model
 
     @classmethod
-    def _build_attribute(cls, *, attr_name, attr_class) -> dict:
-        if cls.should_set_field_none(field_name=attr_name, field_cls=attr_class):
+    def _build_attribute(cls, *, attr_name, attr) -> dict:
+        if cls.should_set_field_none(field_name=attr_name, field_cls=attr):
             return {attr_name: None}
         elif hasattr(cls, attr_name):
             return {attr_name: cls.set_field_from_factory(field_name=attr_name)}
         else:
-            return {attr_name: cls.set_field(field_name=attr_name, field_cls=attr_class)}
+            return {attr_name: cls.set_field(field_name=attr_name, field_cls=attr)}
         pass
+
+    @classmethod
+    def _min_range(cls):
+        return 0 if cls.__allow_empty__ else 1
+
+    @classmethod
+    def _get_known_types(cls):
+        return cls._known_types
+
+
+def utf8_bytes(string):
+    return bytes(string, 'utf-8')
 
 
 def is_pynamo_model(model) -> bool:
