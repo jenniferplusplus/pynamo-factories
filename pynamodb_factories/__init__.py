@@ -1,6 +1,6 @@
 from .factory import PynamoModelFactory
 from .fields import Use, Required, Ignored
-from .exceptions import UnsupportedException, ConfigurationError
+from .exceptions import UnsupportedException, ModelError
 
 __all__ = [
     'PynamoModelFactory',
@@ -8,5 +8,5 @@ __all__ = [
     'Required',
     'Ignored',
     'UnsupportedException',
-    'ConfigurationError',
+    'ModelError',
 ]
