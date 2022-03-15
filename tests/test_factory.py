@@ -10,7 +10,8 @@ from tests.test_models.models import EmptyModel, NumberModel, BinaryModel, Boole
 t = int(datetime.utcnow().timestamp())
 
 
-@mark.parametrize('seed', range(t, t + 20))
+# @mark.parametrize('seed', range(t, t + 20))
+@mark.parametrize('seed', [1647351215])
 class TestFactories:
     def test_model(self, seed):
         class EmptyFactory(PynamoModelFactory):

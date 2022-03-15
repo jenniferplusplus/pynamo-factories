@@ -35,7 +35,7 @@ class PynamoModelFactory(ABC, Generic[T]):
     set attribute can be any value, a callable, or an instance of the Use class. Callables will be executed and the
     return value assigned to the attribute.
 
-    # Usage:
+    ## Usage
     ```
     class MyFactory(PythonModelFactory):
         __model__ = MyModel
@@ -44,8 +44,7 @@ class PynamoModelFactory(ABC, Generic[T]):
     faked_MyModel = MyFactory.build(**build_kwargs)
     ```
 
-    # Attributes:
-
+    Attributes:
         __model__: The schema to generate fake models of
         __faker__: (Optional) Your own custom configured Faker instance
         __allow_nulls__: (Optional) Whether to allow None values in attributes which can accept them. Defaults to True.
@@ -54,19 +53,13 @@ class PynamoModelFactory(ABC, Generic[T]):
             Defaults to False. As of PynamoDB 5.3.x, only the DiscriminatorAttribute is unsupported. Raising can make
             this issue easier to identify. Suppressing the exception allows you to provide handling for it yourself.
             To do this, override the set_field() method in your factory class.
+
     """
+
     __model__: Type[T]
-    """The schema to generate fake models of"""
-
     __faker__: Optional[Faker]
-    """(Optional) Your own custom configured Faker instance"""
-
     __allow_nulls__: bool = True
-    """(Optional) Whether to allow None values in attributes which can accept them. Defaults to True."""
-
     __allow_empty__: bool = True
-    """(Optional) Whether to allow collection attributes to have zero length. Defaults to True."""
-
     __raise_unsupported__: bool = False
 
     @classmethod
@@ -79,8 +72,12 @@ class PynamoModelFactory(ABC, Generic[T]):
     def build(cls, **kwargs) -> T:
         """
         Builds an instance of the factory's __model__
-        :param kwargs: Will be trimmed to remove extraneous items and passed to the schema constructor
-        :return: An instance of the __model__ schema class
+
+        Args:
+            kwargs: Will be trimmed to remove extraneous items and passed to the schema constructor
+
+        Returns:
+            An instance of the __model__ schema class
         """
         keys = []
         for field_name, field in cls._get_model().get_attributes().items():
@@ -100,10 +97,13 @@ class PynamoModelFactory(ABC, Generic[T]):
     def create_factory(cls, model: Type[T], base_factory: Optional[Type["PynamoModelFactory"]] = None, **kwargs):
         """
         Dynamically create a PynamoModelFactory for the given Pynamo Model.
-        :param model: the model to be manufactured
-        :param base_factory: an existing factory to inherit from
-        :param kwargs: args to be passed to the
-        :return: a PynamoModelFactory. Call .build() to build a model.
+
+        Args:
+            model: the model to be manufactured
+            base_factory: an existing factory to inherit from
+            kwargs: args to be passed to the
+        Returns:
+            A PynamoModelFactory object. Call .build() to build a model.
         """
 
         kwargs.setdefault("__faker__", cls.get_faker())
@@ -126,9 +126,12 @@ class PynamoModelFactory(ABC, Generic[T]):
     def set_field_from_factory(cls, field_name):
         """
         Sets a field based a custom attribute from the factory
-        :param cls: The current factory class
-        :param field_name: The name of the attribute
-        :return: The value to be set on the generated model attribute
+
+        Args:
+            cls: The current factory class
+            field_name: The name of the attribute
+        Returns:
+            The value to be set on the generated model attribute
         """
         field = getattr(cls, field_name)
         if isinstance(field, Use):
@@ -141,15 +144,18 @@ class PynamoModelFactory(ABC, Generic[T]):
     def set_field(cls, *, field_name, field: Attribute):
         """
         Generates a value with Faker to be assigned to the attribute
-        :param field_name: The name of the attribute
-        :param field: The schema attribute object itself
-        :return: The value to be set on the generated model attribute
+
+        Args:
+            field_name: The name of the attribute
+            field: The schema attribute object itself
+        Returns:
+            The value to be set on the generated model attribute
         """
         fake = cls.get_faker()
         if isinstance(field, BinaryAttribute):
             return bytes(fake.sentence(), 'utf-8')
         if isinstance(field, BinarySetAttribute):
-            return map(utf8_bytes, fake.sentences(randint(0, 5)))
+            return map(_utf8_bytes, fake.sentences(randint(0, 5)))
         if isinstance(field, BooleanAttribute):
             return fake.pybool()
         if isinstance(field, UnicodeAttribute):
@@ -195,9 +201,11 @@ class PynamoModelFactory(ABC, Generic[T]):
     def should_set_field_none(cls, *, field_name, field) -> bool:
         """
         Override to define custom criteria for when a field should be None
-        :param field_name: The name of the attribute
-        :param field: The schema attribute object itself
-        :return: bool. True to set None, False to set a value.
+        Args:
+            field_name: The name of the attribute
+            field: The schema attribute object itself
+        Returns:
+            bool. True to set None, False to set a value.
         """
         if not cls.__allow_nulls__:
             return False
@@ -212,9 +220,11 @@ class PynamoModelFactory(ABC, Generic[T]):
     def should_set_field_default(cls, *, field_name, field) -> bool:
         """
         Override to define custom criteria for when a field should be set to its default or default_for_new value
-        :param field_name: The name of the attribute
-        :param field: The schema attribute object itself
-        :return: bool. True to allow the default value, False to set a generated value.
+        Args:
+            field_name: The name of the attribute
+            field: The schema attribute object itself
+        Returns:
+            bool. True to allow the default value, False to set a generated value.
         """
         if field.default or field.default_for_new:
             return random() <= 0.25
@@ -235,16 +245,16 @@ class PynamoModelFactory(ABC, Generic[T]):
 
     @classmethod
     def _build_field(cls, *, field_name, field) -> (dict, bool):
-        if cls.should_set_field_none(field_name=field_name, field=field):
-            return {field_name: None}
-        elif hasattr(cls, field_name):
-            if isinstance(cls[field_name], Required):
+        set_none = cls.should_set_field_none(field_name=field_name, field=field)
+        none_result = {field_name: None}
+        if hasattr(cls, field_name):
+            if isinstance(getattr(cls, field_name), Required):
                 return {}, True
-            if isinstance(cls[field_name], Ignored):
+            if isinstance(getattr(cls, field_name), Ignored):
                 return {}, False
-            return {field_name: cls.set_field_from_factory(field_name=field_name)}, False
+            return none_result if set_none else {field_name: cls.set_field_from_factory(field_name=field_name)}, False
         else:
-            return {field_name: cls.set_field(field_name=field_name, field=field)}, False
+            return none_result if set_none else {field_name: cls.set_field(field_name=field_name, field=field)}, False
         pass
 
     @classmethod
@@ -252,9 +262,5 @@ class PynamoModelFactory(ABC, Generic[T]):
         return 0 if cls.__allow_empty__ else 1
 
 
-def utf8_bytes(string):
+def _utf8_bytes(string):
     return bytes(string, 'utf-8')
-
-
-def is_pynamo_model(model) -> bool:
-    return issubclass(model, PynamoModel)
