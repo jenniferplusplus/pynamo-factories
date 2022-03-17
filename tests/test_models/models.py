@@ -15,6 +15,10 @@ class ComplexMap(MapAttribute):
     birthday = UTCDateTimeAttribute()
 
 
+class MapListMap(MapAttribute):
+    arr = ListAttribute(of=ComplexMap)
+
+
 class EmptyModel(Model):
     Meta = Meta
     pass
@@ -80,3 +84,8 @@ class MapModel(EmptyModel):
 class ListModel(EmptyModel):
     list = ListAttribute()
     list_of = ListAttribute(of=ComplexMap)
+
+
+class MapListMapModel(EmptyModel):
+    map = MapListMap()
+    val = NumberAttribute(default=1001)

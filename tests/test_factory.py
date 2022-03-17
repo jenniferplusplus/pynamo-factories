@@ -5,13 +5,13 @@ from pynamodb.models import Model
 
 from pynamodb_factories.factory import PynamoModelFactory
 from tests.test_models.models import EmptyModel, NumberModel, BinaryModel, BooleanModel, UnicodeModel, JsonModel, \
-    VersionModel, TtlModel, DateModel, NullModel, MapModel, ListModel, ComplexMap
+    VersionModel, TtlModel, DateModel, NullModel, MapModel, ListModel, ComplexMap, MapListMapModel
 
 t = int(datetime.utcnow().timestamp())
 
 
-# @mark.parametrize('seed', range(t, t + 20))
-@mark.parametrize('seed', [1647351215])
+@mark.parametrize('seed', range(t, t + 20))
+# @mark.parametrize('seed', [1647351215])
 class TestFactories:
     def test_model(self, seed):
         class EmptyFactory(PynamoModelFactory):
@@ -221,6 +221,22 @@ class TestFactories:
         assert actual.map_of.name == 'given name'
         assert actual.map_of.email == 'given_email@example.com'
         assert actual.map_of.birthday == datetime(1990, 1, 1, 12, 0, 0)
+
+    def test_nested_build_args(self, seed):
+        class MapListMapFactory(PynamoModelFactory):
+            __model__ = MapListMapModel
+            pass
+
+        build_args = {
+            'map': {'arr': [
+                {'name': 'one', 'birthday': datetime(1990, 1, 1, 12, 0, 0)},
+                {'name': 'two', 'email': 'given_email@example.com'},
+            ]}
+        }
+
+        MapListMapFactory.set_random_seed(seed)
+        actual = MapListMapFactory.build(**build_args)
+        assert actual.serialize() is not None
 
     def test_extra_build_args(self, seed):
         class MapFactory(PynamoModelFactory):

@@ -1,7 +1,7 @@
 from abc import ABC
 from datetime import timezone
 from random import random, seed as random_seed, randint
-from typing import Generic, Type, Optional, TypeVar, cast, Union
+from typing import Generic, Type, Optional, TypeVar, cast, Union, Any
 
 from faker import Faker
 from pynamodb.models import Model as PynamoModel
@@ -85,8 +85,8 @@ class PynamoModelFactory(ABC, Generic[T]):
             if cls.should_set_field_default(field_name=field_name, field=field):
                 # Leave the field out of the dict and PynamoDB will set the default value on creation
                 pass
-            elif field_name not in kwargs and isinstance(field, Attribute):
-                build_arg, required = cls._build_field(field_name=field_name, field=field)
+            elif isinstance(field, Attribute):
+                build_arg, required = cls._build_field(field_name=field_name, field=field, build_arg=kwargs.get(field_name))
                 if required and field_name not in kwargs:
                     raise RequiredArgumentError(f"Required argument {field_name} was not in the build kwargs")
                 kwargs.update(build_arg)
@@ -141,7 +141,7 @@ class PynamoModelFactory(ABC, Generic[T]):
         return field
 
     @classmethod
-    def set_field(cls, *, field_name, field: Attribute):
+    def set_field(cls, *, field_name, field: Attribute, build_arg: Any):
         """
         Generates a value with Faker to be assigned to the attribute
 
@@ -153,42 +153,47 @@ class PynamoModelFactory(ABC, Generic[T]):
         """
         fake = cls.get_faker()
         if isinstance(field, BinaryAttribute):
-            return bytes(fake.sentence(), 'utf-8')
+            return build_arg if build_arg is not None else bytes(fake.sentence(), 'utf-8')
         if isinstance(field, BinarySetAttribute):
-            return map(_utf8_bytes, fake.sentences(randint(0, 5)))
+            return build_arg if build_arg is not None else map(_utf8_bytes, fake.sentences(randint(0, 5)))
         if isinstance(field, BooleanAttribute):
-            return fake.pybool()
+            return build_arg if build_arg is not None else fake.pybool()
         if isinstance(field, UnicodeAttribute):
-            return fake.sentence()
+            return build_arg if build_arg is not None else fake.sentence()
         if isinstance(field, UnicodeSetAttribute):
-            return fake.sentences(randint(cls._min_range(), 5))
+            return build_arg if build_arg is not None else fake.sentences(randint(cls._min_range(), 5))
         if isinstance(field, JSONAttribute):
-            return fake.pydict(
+            return build_arg if build_arg is not None else fake.pydict(
                 allowed_types=['str', 'int', 'float', 'email', 'address', 'job', 'phone_number', 'name', 'iso8601'])
         if isinstance(field, VersionAttribute):
-            return fake.pyint(1, 5)
+            return build_arg if build_arg is not None else fake.pyint(1, 5)
         if isinstance(field, NumberAttribute):
-            return fake.pyint()
+            return build_arg if build_arg is not None else fake.pyint()
         if isinstance(field, NumberSetAttribute):
-            return fake.pylist(randint(cls._min_range(), 5), False, value_types='int')
+            return build_arg if build_arg is not None else fake.pylist(randint(cls._min_range(), 5), False, value_types='int')
         if isinstance(field, TTLAttribute):
-            return fake.date_time_this_year(after_now=True, tzinfo=timezone.utc)
+            return build_arg if build_arg is not None else fake.date_time_this_year(after_now=True, tzinfo=timezone.utc)
         if isinstance(field, UTCDateTimeAttribute):
-            return fake.date_time(tzinfo=timezone.utc)
+            return build_arg if build_arg is not None else fake.date_time(tzinfo=timezone.utc)
         if isinstance(field, NullAttribute):
             return None
         if isinstance(field, MapAttribute) or (DynamicMapAttribute and isinstance(field, DynamicMapAttribute)):
             if field is MapAttribute or field is DynamicMapAttribute:
                 # Just a raw MapAttribute
-                return fake.pydict()
+                return build_arg if build_arg is not None else fake.pydict()
             else:
-                return cls.create_factory(field.__class__).build()
+                build_arg = build_arg if build_arg is not None else {}
+                return cls.create_factory(field.__class__).build(**build_arg)
         if isinstance(field, ListAttribute):
             if field.element_type:
                 factory = cls.create_factory(field.element_type)
                 values = []
-                for _ in range(randint(cls._min_range(), 5)):
-                    values.append(factory.build())
+                if build_arg is not None:
+                    for arg in build_arg:
+                        values.append(factory.build(**arg))
+                else:
+                    for _ in range(randint(cls._min_range(), 5)):
+                        values.append(factory.build())
                 return values
             else:
                 return fake.words(randint(0, 5))
@@ -244,7 +249,7 @@ class PynamoModelFactory(ABC, Generic[T]):
         return cls.__model__
 
     @classmethod
-    def _build_field(cls, *, field_name, field) -> (dict, bool):
+    def _build_field(cls, *, field_name, field, build_arg) -> (dict, bool):
         set_none = cls.should_set_field_none(field_name=field_name, field=field)
         none_result = {field_name: None}
         if hasattr(cls, field_name):
@@ -254,7 +259,7 @@ class PynamoModelFactory(ABC, Generic[T]):
                 return {}, False
             return none_result if set_none else {field_name: cls.set_field_from_factory(field_name=field_name)}, False
         else:
-            return none_result if set_none else {field_name: cls.set_field(field_name=field_name, field=field)}, False
+            return none_result if set_none else {field_name: cls.set_field(field_name=field_name, field=field, build_arg=build_arg)}, False
         pass
 
     @classmethod
